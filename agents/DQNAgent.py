@@ -12,11 +12,11 @@ class DQNAgent:
     def store_transition(self, state, action, reward, next_state) -> None:
         pass
 
-    def learn() -> None:
+    def learn(self) -> None:
         pass
 
-    def load() -> None:
+    def load(self) -> None:
         pass
     
-    def save() -> None:
+    def save(self) -> None:
         pass
