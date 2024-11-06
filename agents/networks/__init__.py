@@ -1,7 +1,9 @@
 from .DQNNetwork import DQNNetwork
-# from .FlappyBirdEnv import Player
+from .PolicyGradientDNN import PolicyGradientDNN
+from .PolicyGradientCNN import PolicyGradientCNN
 
 __all__ = [
-    "DQNNetwork"
-    # "Player"
+    "DQNNetwork",
+    "PolicyGradientDNN",
+    "PolicyGradientCNN"
 ]

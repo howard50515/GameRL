@@ -4,7 +4,7 @@ import numpy as np
 import pygame
 import random
 
-from typing import Any
+from typing import Any, Literal, Callable
 
 from .FlappyBirdEnvConstants import *
 
@@ -17,8 +17,8 @@ class Player(pygame.sprite.Sprite):
         self.rect.center = (x, y)
         self.y_velocity = PLAYER_INIT_VELOCITY
 
-    def update(self, gravity) -> None:
-        self._apply_gravity(gravity)
+    def update(self) -> None:
+        self._apply_gravity()
         self.rect.y -= self.y_velocity
 
     def draw(self, screen: pygame.Surface) -> None:
@@ -27,8 +27,8 @@ class Player(pygame.sprite.Sprite):
     def jump(self) -> None:
         self.y_velocity = PLAYER_JUMP_VELOCITY
 
-    def _apply_gravity(self, gravity) -> None:
-        self.y_velocity -= gravity
+    def _apply_gravity(self) -> None:
+        self.y_velocity -= GRAVITY
         self.y_velocity = min(PLAYER_MAX_VELOCITY, self.y_velocity)
         self.y_velocity = max(PLAYER_MIN_VELOCITY, self.y_velocity)
 
@@ -51,10 +51,12 @@ class FlappyBirdEnv(gym.Env):
     """
         The FlappyBird Environment.
 
-        mode         : observation 模式，0 回傳純數字表示玩家和管道位置、速度， 1 回傳畫面截圖
+        mode         : observation 模式，0 回傳純數字表示角色和管道位置、速度， 1 回傳畫面截圖
         screen_debug : 是否顯示遊戲畫面，當 mode 為 1 時，強制顯示遊戲畫面。
     """
-    def __init__(self, mode, screen_debug) -> None:
+    def __init__(self, 
+                 mode: Literal[0, 1], 
+                 screen_debug: bool,) -> None:
         if not isinstance(mode, int):
             raise ValueError('mode should be a integer.')
         
@@ -63,7 +65,7 @@ class FlappyBirdEnv(gym.Env):
         
         if not isinstance(screen_debug, bool):
             raise ValueError('screen_debug should be boolean.')
-
+        
         self.mode = mode
         self.screen_debug = screen_debug
 
@@ -72,21 +74,26 @@ class FlappyBirdEnv(gym.Env):
         if mode == 1 or screen_debug:
             self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
             pygame.display.set_caption("Jumping Game")
-        self.scoreFont = pygame.font.Font(None, 36)
+            self.scoreFont = pygame.font.Font(None, 36)
 
         self._init_sprites()
 
+        self.survived_tick = 0
         self.total_distance = 0
-        self.move_distance = 0
+        self.total_reward = 0
         self.game_over = False
+        self.over_pipe = False
         self.score = 0
 
     def reset(self) -> tuple[np.ndarray, dict[str, Any]]:
         self._init_sprites()
 
+        self.survived_tick = 0
         self.total_distance = 0
-        self.move_distance = 0
+        self.total_reward = 0
         self.game_over = False
+        self.over_pipe = False
+        self.pipe_collide = False
         self.score = 0
         
         observation = self._get_observation()
@@ -94,7 +101,8 @@ class FlappyBirdEnv(gym.Env):
 
         return observation, info
     
-    def step(self, action: Any) -> tuple[np.ndarray, float, bool, dict[str, Any]]:
+    def step(self, 
+             action: Literal[0, 1]) -> tuple[np.ndarray, float, bool, dict[str, Any]]:
         if self.game_over:
             raise ValueError('game is over. use \'reset()\' to restart the game.')
         
@@ -109,9 +117,15 @@ class FlappyBirdEnv(gym.Env):
         observation = self._get_observation()
         reward = self._calculate_reward(action)
         truncated = self.game_over
-        info = self._get_info()
 
+        self.survived_tick += 1
+        self.total_reward += reward
+        info = self._get_info()
+        
         return observation, reward, truncated, info
+    
+    def get_observation_shape(self) -> tuple[int, ...]:
+        return self._get_observation().shape
     
     def close(self) -> None:
         pygame.quit()
@@ -119,44 +133,78 @@ class FlappyBirdEnv(gym.Env):
     
     def _get_observation(self) -> np.ndarray:
         if self.mode == 0:
-            observation = [self.player.rect.center[1], self.player.y_velocity]
+            observation = [self.player.rect.center[1] / SCREEN_HEIGHT, self.player.y_velocity]
             pipe_observation = [x for i, pipe in enumerate(self.pipes) 
-                                    if i % 2 == 0 and pipe.rect.x > self.player.rect.center[0] 
-                                    for x in (pipe.rect.x, pipe.spacing_y)]
-            pipe_observation.extend([-1, -1] * ((6 - len(pipe_observation)) // 2))
+                                    if i % 2 == 0 and self._pipe_in_front(pipe)
+                                    for x in ((pipe.rect.x - self.player.rect.center[0]) / SCREEN_WIDTH, pipe.spacing_y / SCREEN_HEIGHT)]
+            # pipe_observation.extend([-1, -1] * ((6 - len(pipe_observation)) // 2))
             observation.extend(pipe_observation)
             return np.array(observation)
         
         # return pygame.surfarray.array3d(self.screen)
-        return self._to_gray_scale(pygame.surfarray.array3d(self.screen))
+        return self._to_gray_scale(pygame.surfarray.array3d(self.screen)).reshape((1, SCREEN_WIDTH, SCREEN_HEIGHT)).astype('float32') / 255.0
     
-    def _calculate_reward(self, action) -> float:
+    def _calculate_reward(self, 
+                          action: Literal[0, 1]) -> float:
         if self.game_over:
-            return -10.0
+            if self.pipe_collide:
+                return -5.0
+            else:
+                return -10.0
         
         if self.over_pipe:
-            return 1.0
+            return 5.0
+        
+        # note: pygame 遊戲中，離螢幕頂部越近，y 值越小
+        # 高於管道洞口下緣，卻仍跳躍，給予懲罰
+        if action == 1:
+            if self.next_pipe.spacing_y + (PIPE_VERTICAL_SPACING // 2) > self.player.rect.center[1]:
+                return -1.0
+            else:
+                return 1.0
+
+        # 低於管道洞口下緣，且正在上升，給予獎勵
+        if self.player.y_velocity > 0 and self.next_pipe.spacing_y + (PIPE_VERTICAL_SPACING // 2) < self.player.rect.center[1]:
+            return 0.1
+        
+        # 高於管道洞口上緣，且正在上升，給予懲罰
+        if self.player.y_velocity > 0 and self.next_pipe.spacing_y - (PIPE_VERTICAL_SPACING // 2) > self.player.rect.center[1]:
+            return -0.1
+        
+        # 高於管道洞口上緣，且正在下墜，給予獎勵
+        if self.player.y_velocity < 0 and self.next_pipe.spacing_y - (PIPE_VERTICAL_SPACING // 2) > self.player.rect.center[1]:
+            return 0.1
   
-        return 0.1
+        # 低於管道洞口下緣，且正在下墜，給予懲罰
+        if self.player.y_velocity < 0 and self.next_pipe.spacing_y + (PIPE_VERTICAL_SPACING // 2) < self.player.rect.center[1]:
+            return -0.1
+        
+        # 如果角色位於管道洞口高度，給予獎勵
+        return 0.01 if abs(self.next_pipe.spacing_y - self.player.rect.center[1]) < (PIPE_VERTICAL_SPACING // 2) else 0.0
+        # return 0.0
     
     def _get_info(self) -> dict[str, Any]:
         return {
-            'score': self.score
+            'score': self.score,
+            'total_reward': self.total_reward,
+            'total_distance': self.total_distance
         }
     
-    def _game_step(self, action) -> None:
+    def _game_step(self, 
+                   action: Literal[0, 1]) -> None:
         if action == 1:
             self.player.jump()
         
-        self.player.update(GRAVITY)
+        self.player.update()
         self._update_pipes()
         self.game_over = self._check_player_game_over()
         self.total_distance += SCREEN_SPEED
-        self.move_distance += SCREEN_SPEED
 
-        # 如果玩家越過前方管道則分數加一，並尋找下一個管道
-        if self.next_pipe.rect.x < self.player.rect.center[0]:
+        # 如果角色越過前方管道則分數加一，並尋找下一個管道
+        if not self._pipe_in_front(self.next_pipe):
             self.next_pipe = self._next_pipe()
+            # 創建新管道，以保持角色面前永遠有三個管道
+            self._new_pipes(self.pipes.sprites()[-1].rect.x + PIPE_HORIZONTAL_SPACING)
             self.over_pipe = True
             self.score += 1
 
@@ -176,17 +224,26 @@ class FlappyBirdEnv(gym.Env):
         # 創建角色
         self.player = Player(PLAYER_INIT_X, PLAYER_INIT_Y)
 
-        # 創建障礙物群組，並生成障礙物
+        # 創建管道群組，並生成管道
         self.pipes = pygame.sprite.Group()
-        self._new_pipes(SCREEN_WIDTH)
+        for i in range(3):
+            self._new_pipes((SCREEN_WIDTH // 2) + i * PIPE_HORIZONTAL_SPACING)
         self.next_pipe = self._next_pipe()
 
+    def _pipe_in_front(self, 
+                       pipe: Pipe) -> bool:
+        return pipe.rect.x >= self.player.rect.center[0]
+
     def _next_pipe(self) -> Pipe:
-        return next(pipe for pipe in self.pipes if pipe.rect.x > self.player.rect.center[0])
+        """
+            尋找離角色最近且位於角色前方的管道
+        """
+        return next(pipe for pipe in self.pipes if self._pipe_in_front(pipe))
         
     def _check_player_game_over(self) -> bool:
         # 角色如果接觸障礙物，遊戲結束回傳 True
         if self._check_pipe_collision():
+            self.pipe_collide = True
             return True
         
         # 角色如果接觸窗口頂部或底部，遊戲結束回傳 True
@@ -198,24 +255,25 @@ class FlappyBirdEnv(gym.Env):
     def _check_pipe_collision(self) -> bool:
         return len(pygame.sprite.spritecollide(self.player, self.pipes, False)) > 0
 
-    def _new_pipes(self, x) -> None:
+    def _new_pipes(self, 
+                   x: int) -> None:
+        """
+            創建新管道
+
+            x : 新管道的 x 座標
+        """
         half_extents = PIPE_VERTICAL_SPACING // 2
 
         y = random.randint(half_extents, SCREEN_HEIGHT - half_extents)
-        top_width = SCREEN_HEIGHT - y - half_extents
         bottom_width = y - half_extents
-        pipe_top = Pipe(PIPE_WIDTH, top_width, x, SCREEN_HEIGHT - top_width, y, RED)
-        pipe_bottom = Pipe(PIPE_WIDTH, bottom_width, x, 0, y, WHITE)
+        top_width = SCREEN_HEIGHT - y - half_extents
+        pipe_top = Pipe(PIPE_WIDTH, bottom_width, x, 0, y, RED)
+        pipe_bottom = Pipe(PIPE_WIDTH, top_width, x, SCREEN_HEIGHT - top_width, y, RED)
 
         self.pipes.add(pipe_top)
         self.pipes.add(pipe_bottom)
 
     def _update_pipes(self) -> None:
-        # 玩家超出螢幕過多，生成新障礙物
-        if self.move_distance >= PIPE_HORIZONTAL_SPACING:
-            self._new_pipes(SCREEN_WIDTH)
-            self.move_distance = 0
-        
         # 將障礙物往前移動
         for pipe in self.pipes:
             pipe.rect.x -= SCREEN_SPEED

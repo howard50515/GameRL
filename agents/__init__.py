@@ -1,7 +1,7 @@
 from .DQNAgent import DQNAgent
-# from .FlappyBirdEnv import Player
+from .PolicyGradientAgent import PolicyGradientAgent
 
 __all__ = [
     "DQNAgent"
-    # "Player"
+    "PolicyGradientAgent"
 ]
