@@ -28,12 +28,12 @@ for i in range(10):
             print(f"Game Over. Score: {info['score']}")
             break
 
-        event = pygame.event.wait()
-        if event.type == pygame.QUIT:
-            running = False
-        elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_SPACE:
-                pass
+        # event = pygame.event.wait()
+        # if event.type == pygame.QUIT:
+        #     running = False
+        # elif event.type == pygame.KEYDOWN:
+        #     if event.key == pygame.K_SPACE:
+        #         pass
 
         # 使主迴圈以 60FPS 運行，以便於觀看遊戲過程
         clock.tick(60)

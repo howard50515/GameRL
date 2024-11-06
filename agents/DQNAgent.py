@@ -5,15 +5,23 @@ import torch.optim as optim
 
 from typing import Literal
 
-from .networks import DQNNetwork
+from .networks import DQNDNN, DQNCNN
 
 class DQNAgent:
     def __init__(self,
                  input_dim, 
                  n_actions: int,
                  lr: float = 0.01) -> None:
-        self.eval_net = DQNNetwork(input_dim, n_actions)
-        self.target_net = DQNNetwork(input_dim, n_actions)
+        self.use_dnn = len(input_dim) == 1
+        input_dim = input_dim[0] if len(input_dim) == 1 else input_dim
+        
+        if self.use_dnn:
+            self.eval_net = DQNDNN(input_dim, n_actions)
+            self.target_net = DQNDNN(input_dim, n_actions)
+        else:
+            self.eval_net = DQNCNN(input_dim, n_actions)
+            self.target_net = DQNCNN(input_dim, n_actions)
+        
         self.optimizer = optim.Adam(self.eval_net.parameters(), lr=lr)
 
     def sample(self, 

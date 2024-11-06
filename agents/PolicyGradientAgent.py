@@ -22,7 +22,7 @@ class PolicyGradientAgent():
             self.network = PolicyGradientDNN(input_dim, n_actions)
         else:
             self.network = PolicyGradientCNN(input_dim, n_actions)
-            
+
         self.optimizer = optim.Adam(self.network.parameters(), lr=lr)
         self.scheduler = optim.lr_scheduler.ExponentialLR(self.optimizer, 0.995)
         self.rewards = []
@@ -35,11 +35,9 @@ class PolicyGradientAgent():
     def sample(self, 
                state: np.ndarray, 
                temperature: float = 1.0, 
-               epsilon:float = 0.1,
-               bias:float = 1.0) -> tuple[int, torch.Tensor]:
+               epsilon:float = 0.1) -> tuple[int, torch.Tensor]:
         logits = self.network(torch.FloatTensor(state))
         if np.random.uniform() < epsilon:
-            print(logits)
             logits[1] = logits[0]
         action_prob = torch.softmax(logits / temperature, dim=-1)
         action_dist = Categorical(action_prob)

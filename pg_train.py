@@ -9,7 +9,7 @@ NUM_BATCHES = 500
 EPISODE_PER_BATCH = 2
 
 # initialize Environment and Agent
-env = FlappyBirdEnv(1, True)
+env = FlappyBirdEnv(1, False)
 
 agent = PolicyGradientAgent(env.get_observation_shape(), 2)
 agent.network.train()

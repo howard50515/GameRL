@@ -1,9 +1,11 @@
-from .DQNNetwork import DQNNetwork
+from .DQNDNN import DQNDNN
+from .DQNCNN import DQNCNN
 from .PolicyGradientDNN import PolicyGradientDNN
 from .PolicyGradientCNN import PolicyGradientCNN
 
 __all__ = [
-    "DQNNetwork",
+    "DQNDNN",
+    "DQNCNN",
     "PolicyGradientDNN",
     "PolicyGradientCNN"
 ]

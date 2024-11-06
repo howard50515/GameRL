@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-class DQNNetwork(nn.Module):
+class DQNCNN(nn.Module):
     def __init__(self, 
                  input_dim,
                  n_actions: int) -> None:

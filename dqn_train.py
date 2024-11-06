@@ -7,9 +7,9 @@ NUM_EPISODES = 200
 STEP_PER_EPISODE = 1000
 
 # initialize Environment and Agent
-env = FlappyBirdEnv(1, False)
+env = FlappyBirdEnv(0, False)
 
-agent = DQNAgent(env.get_observation_shape()[0], 2)
+agent = DQNAgent(env.get_observation_shape(), 2)
 agent.eval_net.train()
 agent.target_net.train()
 
