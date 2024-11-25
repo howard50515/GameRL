@@ -3,6 +3,7 @@ import gymnasium as gym
 import numpy as np
 import pygame
 import random
+import time
 
 from typing import Any, Literal, Callable
 
@@ -37,14 +38,19 @@ class Pipe(pygame.sprite.Sprite):
     def __init__(self, width, height, x, y, spacing_y, color) -> None:
         super().__init__()
         self.image = pygame.Surface((width, height))
+        self.spacing_image = pygame.Surface((width, PIPE_VERTICAL_SPACING))
         self.rect = self.image.get_rect()
         self.rect.x = x
         self.rect.y = y
         self.spacing_y = spacing_y
         self.image.fill(color)
+        self.spacing_image.fill(BLUE)
 
     def update(self) -> None:
         pass
+
+    def blit_spacing(self, screen: pygame.Surface):
+        screen.blit(self.spacing_image, (self.rect.x, self.spacing_y - (PIPE_VERTICAL_SPACING // 2)))
 
 
 class FlappyBirdEnv(gym.Env):
@@ -55,13 +61,13 @@ class FlappyBirdEnv(gym.Env):
         screen_debug : 是否顯示遊戲畫面，當 mode 為 1 時，強制顯示遊戲畫面。
     """
     def __init__(self, 
-                 mode: Literal[0, 1], 
-                 screen_debug: bool,) -> None:
-        if not isinstance(mode, int):
-            raise ValueError('mode should be a integer.')
+                 mode: Literal['numeric', 'rgb', 'gray'], 
+                 screen_debug: bool) -> None:
+        if not isinstance(mode, str):
+            raise ValueError('mode should be str, with one of [\'numeric\', \'rgb\', \'gray\'].')
         
-        if mode != 0 and mode != 1:
-            raise ValueError('mode should be 0 or 1.')
+        if isinstance(mode, str) and mode != 'numeric' and mode != 'rgb' and mode != 'gray':
+            raise ValueError(f'invalid mode \'{mode}\'. mode should be one of [\'numeric\', \'rgb\', \'gray\'].')
         
         if not isinstance(screen_debug, bool):
             raise ValueError('screen_debug should be boolean.')
@@ -71,23 +77,17 @@ class FlappyBirdEnv(gym.Env):
 
         pygame.init()
         self.screen = None
-        if mode == 1 or screen_debug:
+        if self._is_img_mode() or screen_debug:
             self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-            pygame.display.set_caption("Jumping Game")
+            pygame.display.set_caption("Flappy Bird Game")
             self.scoreFont = pygame.font.Font(None, 36)
 
-        self._init_sprites()
-
-        self.survived_tick = 0
-        self.total_distance = 0
-        self.total_reward = 0
-        self.game_over = False
-        self.over_pipe = False
-        self.score = 0
+        self.reset()
 
     def reset(self) -> tuple[np.ndarray, dict[str, Any]]:
         self._init_sprites()
 
+        self.history = []
         self.survived_tick = 0
         self.total_distance = 0
         self.total_reward = 0
@@ -95,7 +95,14 @@ class FlappyBirdEnv(gym.Env):
         self.over_pipe = False
         self.pipe_collide = False
         self.score = 0
+        self.keep = 0
         
+        self._screen_image = None
+        self._image_tick = 0
+
+        if self._is_img_mode():
+            self.img_list = []
+
         observation = self._get_observation()
         info = self._get_info()
 
@@ -107,87 +114,105 @@ class FlappyBirdEnv(gym.Env):
             raise ValueError('game is over. use \'reset()\' to restart the game.')
         
         if not isinstance(action, int):
-            raise ValueError('action should be a integer.')
+            raise ValueError(f'action is expected a integer, get {type(action)} instead.')
         
         if action != 0 and action != 1:
             raise ValueError('action should be 0 or 1.')
 
         self.over_pipe = False
+        self.last_y_velocity = self.player.y_velocity
+
         self._game_step(action)
         observation = self._get_observation()
         reward = self._calculate_reward(action)
         truncated = self.game_over
 
-        self.survived_tick += 1
+        if action == 1:
+            self.history.append(f'jump at {self.survived_tick}')
         self.total_reward += reward
         info = self._get_info()
-        
+
+        if self.mode == 'rgb':
+            self.img_list.append(self._get_rgb_screen_image().transpose([1, 0, 2]))
+        elif self.mode == 'gray':
+            self.img_list.append(self._get_gray_scale_screen_image().transpose([1, 0]))
+            
+        self.survived_tick += 1
+
         return observation, reward, truncated, info
     
     def get_observation_shape(self) -> tuple[int, ...]:
         return self._get_observation().shape
+    
+    def save_game_video(self, 
+                       file_name: str, 
+                       fps: float) -> None:
+        if not self._is_img_mode():
+            print('Warning: save_game_video is only avaiable in mode with one of [\'rgb\', \'gray\']')
+            print('Can not generate game video.')
+            return
+        
+        if self.mode == 'rgb':
+            out = cv2.VideoWriter(file_name, cv2.VideoWriter_fourcc(*'mp4v'), fps, (SCREEN_WIDTH, SCREEN_HEIGHT))
+        else:
+            out = cv2.VideoWriter(file_name, cv2.VideoWriter_fourcc(*'mp4v'), fps, (SCREEN_WIDTH, SCREEN_HEIGHT), False)
+
+        for img in self.img_list:
+            out.write(img)
+        out.release()
     
     def close(self) -> None:
         pygame.quit()
         super().close()
     
     def _get_observation(self) -> np.ndarray:
-        if self.mode == 0:
+        if self.mode == 'numeric':
             observation = [self.player.rect.center[1] / SCREEN_HEIGHT, self.player.y_velocity]
             pipe_observation = [x for i, pipe in enumerate(self.pipes) 
                                     if i % 2 == 0 and self._pipe_in_front(pipe)
                                     for x in ((pipe.rect.x - self.player.rect.center[0]) / SCREEN_WIDTH, pipe.spacing_y / SCREEN_HEIGHT)]
-            # pipe_observation.extend([-1, -1] * ((6 - len(pipe_observation)) // 2))
             observation.extend(pipe_observation)
             return np.array(observation)
         
-        # return pygame.surfarray.array3d(self.screen)
-        return self._to_gray_scale(pygame.surfarray.array3d(self.screen)).reshape((1, SCREEN_WIDTH, SCREEN_HEIGHT)).astype('float32') / 255.0
+        if self.mode == 'rgb':
+            resized_image = cv2.resize(self._get_rgb_screen_image(), 
+                (OBSERVATION_HEIGHT, OBSERVATION_WIDTH), interpolation=cv2.INTER_AREA)
+        else:
+            resized_image = cv2.resize(self._get_gray_scale_screen_image(), 
+                (OBSERVATION_HEIGHT, OBSERVATION_WIDTH), interpolation=cv2.INTER_AREA)[:, :, np.newaxis]
+            
+        return resized_image.transpose([2, 0, 1]).astype('float32') / 255.0
     
     def _calculate_reward(self, 
                           action: Literal[0, 1]) -> float:
         if self.game_over:
-            if self.pipe_collide:
-                return -5.0
-            else:
-                return -10.0
+            return -3.0
         
         if self.over_pipe:
-            return 5.0
+            return 1.0
         
-        # note: pygame 遊戲中，離螢幕頂部越近，y 值越小
-        # 高於管道洞口下緣，卻仍跳躍，給予懲罰
-        if action == 1:
-            if self.next_pipe.spacing_y + (PIPE_VERTICAL_SPACING // 2) > self.player.rect.center[1]:
-                return -1.0
-            else:
-                return 1.0
+        half_extents = PIPE_VERTICAL_SPACING // 2
 
-        # 低於管道洞口下緣，且正在上升，給予獎勵
-        if self.player.y_velocity > 0 and self.next_pipe.spacing_y + (PIPE_VERTICAL_SPACING // 2) < self.player.rect.center[1]:
+        pipe_hole_y = self.next_pipe.spacing_y
+        player_y = self.player.rect.center[1]
+
+        hole_distance_ratio = (abs(pipe_hole_y - player_y) / half_extents) - 1
+        
+        if hole_distance_ratio <= -0.5:
             return 0.1
-        
-        # 高於管道洞口上緣，且正在上升，給予懲罰
-        if self.player.y_velocity > 0 and self.next_pipe.spacing_y - (PIPE_VERTICAL_SPACING // 2) > self.player.rect.center[1]:
-            return -0.1
-        
-        # 高於管道洞口上緣，且正在下墜，給予獎勵
-        if self.player.y_velocity < 0 and self.next_pipe.spacing_y - (PIPE_VERTICAL_SPACING // 2) > self.player.rect.center[1]:
-            return 0.1
-  
-        # 低於管道洞口下緣，且正在下墜，給予懲罰
-        if self.player.y_velocity < 0 and self.next_pipe.spacing_y + (PIPE_VERTICAL_SPACING // 2) < self.player.rect.center[1]:
-            return -0.1
-        
-        # 如果角色位於管道洞口高度，給予獎勵
-        return 0.01 if abs(self.next_pipe.spacing_y - self.player.rect.center[1]) < (PIPE_VERTICAL_SPACING // 2) else 0.0
-        # return 0.0
+        elif hole_distance_ratio <= 0.0:
+            return -hole_distance_ratio * 0.1
+        else:
+            return -min(hole_distance_ratio, 1) * 0.1
+
+        # return -min(1, (abs(pipe_hole_y - player_y) / half_extents) - 1) * 0.1
     
     def _get_info(self) -> dict[str, Any]:
         return {
             'score': self.score,
             'total_reward': self.total_reward,
-            'total_distance': self.total_distance
+            'total_distance': self.total_distance,
+            'history' : self.history
         }
     
     def _game_step(self, 
@@ -208,15 +233,23 @@ class FlappyBirdEnv(gym.Env):
             self.over_pipe = True
             self.score += 1
 
-        if self.mode == 1 or self.screen_debug:
+        if self._is_img_mode() or self.screen_debug:
             # 繪製畫面
             self.screen.fill(BLACK)
+
+            # for pipe in self.pipes:
+            #     pipe.blit_spacing(self.screen)
+
             self.player.draw(self.screen)
             self.pipes.draw(self.screen)
             score_text = self.scoreFont.render("Score: " + str(self.score), True, WHITE)
             self.screen.blit(score_text, (10, 10))  # 在左上角位置繪製分數
-            # pygame.surfarray.blit_array(self.screen, self._to_gray_scale(pygame.surfarray.array3d(self.screen)))
-            
+
+            if self.mode == 'gray':
+                gray_scale_screen =  np.repeat(
+                    self._get_gray_scale_screen_image()[:, :, np.newaxis], 3, axis=2)
+                pygame.surfarray.blit_array(self.screen, gray_scale_screen)
+
             # 更新畫面
             pygame.display.flip()
 
@@ -225,7 +258,7 @@ class FlappyBirdEnv(gym.Env):
         self.player = Player(PLAYER_INIT_X, PLAYER_INIT_Y)
 
         # 創建管道群組，並生成管道
-        self.pipes = pygame.sprite.Group()
+        self.pipes: pygame.sprite.Group[Pipe] = pygame.sprite.Group()
         for i in range(3):
             self._new_pipes((SCREEN_WIDTH // 2) + i * PIPE_HORIZONTAL_SPACING)
         self.next_pipe = self._next_pipe()
@@ -281,9 +314,26 @@ class FlappyBirdEnv(gym.Env):
         # 删除超出窗口的障礙物
         self.pipes.remove(*[pipe for pipe in self.pipes if pipe.rect.x < 0])
 
-    def _to_gray_scale(self, arr) -> np.ndarray:
-        # 0.2989 0.587 0.114
-        # gray_scale = cv2.cvtColor(arr, cv2.COLOR_RGB2GRAY)
-        # np.round(np.dot(arr[...,:], [0.2989, 0.5870, 0.1140]))
-        return cv2.cvtColor(arr, cv2.COLOR_RGB2GRAY)
-        # return np.dstack((gary_scale, gary_scale, gary_scale))
+    def _get_gray_scale_screen_image(self) -> np.ndarray:
+        if self.mode == 'numeric':
+            return None
+    
+        return cv2.cvtColor(self._get_rgb_screen_image(), cv2.COLOR_RGB2GRAY)
+
+    def _get_rgb_screen_image(self):
+        if self.mode == 'numeric':
+            return None
+
+        # 快取截圖，如果此 tick 已計算過截圖，則直接回傳快取
+        # 在 _game_step() 前調用，可能會有問題
+        if self._image_tick == self.survived_tick and self._screen_image is not None:
+            return self._screen_image
+        
+        image = pygame.surfarray.array3d(self.screen)
+        self._image_tick = self.survived_tick
+        self._screen_image = image
+
+        return image
+    
+    def _is_img_mode(self) -> bool:
+        return self.mode == 'rgb' or self.mode == 'gray'

@@ -11,9 +11,8 @@ class PolicyGradientAgent():
     def __init__(self, 
                  input_dim: tuple[int, ...],
                  n_actions: int,
-                 lr: float = 0.001,
-                 gamma: float = 0.9,
-                 entropy_term: float = 0.01) -> None:
+                 lr: float = 1e-4,
+                 gamma: float = 0.95,) -> None:
         
         self.use_dnn = len(input_dim) == 1
         input_dim = input_dim[0] if len(input_dim) == 1 else input_dim
@@ -30,15 +29,11 @@ class PolicyGradientAgent():
         self.episode_rewards = []
         self.episode_log_probs = []
         self.gamma = gamma
-        self.entropy_term = entropy_term
 
     def sample(self, 
                state: np.ndarray, 
-               temperature: float = 1.0, 
-               epsilon:float = 0.1) -> tuple[int, torch.Tensor]:
+               temperature: float = 1.0) -> tuple[int, torch.Tensor]:
         logits = self.network(torch.FloatTensor(state))
-        if np.random.uniform() < epsilon:
-            logits[1] = logits[0]
         action_prob = torch.softmax(logits / temperature, dim=-1)
         action_dist = Categorical(action_prob)
         action = action_dist.sample()
@@ -76,13 +71,13 @@ class PolicyGradientAgent():
         if len(self.rewards) > 0 and len(self.log_probs) > 0:
             self.store_episode()
 
+        self.optimizer.zero_grad()
         for rewards, log_probs in zip(self.episode_rewards, self.episode_log_probs):
             rewards = torch.FloatTensor(rewards)
             log_probs = torch.stack(log_probs)
 
             loss = (-log_probs * rewards).sum()
             
-            self.optimizer.zero_grad()
             loss.backward()
 
         self.optimizer.step()
