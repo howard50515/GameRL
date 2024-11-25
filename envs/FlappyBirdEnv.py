@@ -147,8 +147,7 @@ class FlappyBirdEnv(gym.Env):
         # return pygame.surfarray.array3d(self.screen)
         return self._to_gray_scale(pygame.surfarray.array3d(self.screen)).reshape((1, SCREEN_WIDTH, SCREEN_HEIGHT)).astype('float32') / 255.0
     
-    def _calculate_reward(self, 
-                          action: Literal[0, 1]) -> float:
+    def _calculate_reward(self, action: Literal[0, 1]) -> float:
         # 如果遊戲結束，根據碰撞情況給予懲罰
         if self.game_over:
             return -5.0 if self.pipe_collide else -10.0
