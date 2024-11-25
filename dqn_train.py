@@ -1,7 +1,9 @@
 import pygame
 import os
 import random
-
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
 from envs import FlappyBirdEnv
 from agents import DQNAgent
 
@@ -19,8 +21,15 @@ epsilon = 1.
 decrease_batch = NUM_EPISODES * 0.6
 decrease_epsilon = 0.98 / decrease_batch
 
+q_values_log = []
+epsilon_log = []
+
 for i_epoch in range(NUM_EPISODES):
     state, _ = env.reset() # reset environment to initial state for each episode
+
+    q_values = agent.eval_net(torch.tensor(state, dtype=torch.float32)).detach().numpy()
+    q_values_log.append(np.max(q_values))  # Record the max Q-value
+    epsilon_log.append(epsilon)
 
     epoch_total_reward = 0
     for i_step in range(STEP_PER_EPISODE):
@@ -44,7 +53,29 @@ for i_epoch in range(NUM_EPISODES):
     if i_epoch < decrease_batch:
         epsilon -= decrease_epsilon
 
-# 儲存模型
+# Plot Q-values and Epsilon
+plt.figure(figsize=(12, 6))
+
+# Plot Q-values
+plt.subplot(1, 2, 1)
+plt.plot(q_values_log, label="Max Q-value", color="blue")
+plt.xlabel("Episode")
+plt.ylabel("Max Q-value")
+plt.title("Q-values over Episodes")
+plt.legend()
+
+# Plot Epsilon
+plt.subplot(1, 2, 2)
+plt.plot(epsilon_log, label="Epsilon", color="red")
+plt.xlabel("Episode")
+plt.ylabel("Epsilon")
+plt.title("Epsilon over Episodes")
+plt.legend()
+
+plt.tight_layout()
+plt.show()
+
+'''# 儲存模型
 output_dir = './dqn_model'
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
@@ -54,4 +85,4 @@ file_name = f'q_learning_{NUM_EPISODES}_{seed_code}.ckpt'
 save_path = os.path.join(output_dir, file_name)
 agent.save(save_path)
 
-print(f"Model saved to: {save_path}")
+print(f"Model saved to: {save_path}")'''
