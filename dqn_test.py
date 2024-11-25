@@ -5,12 +5,12 @@ from agents import DQNAgent
 
 EPOCHS = 200
 STEP_PER_EPOCH = 1000
-CHECKPOINT_PATH = './q learning.cpkt'
+CHECKPOINT_PATH = './dqn_model/q_learning_100_258.ckpt'
 
 # initialize Environment and Agent
-env = FlappyBirdEnv(1, True)
+env = FlappyBirdEnv(0, True)
 
-agent = DQNAgent(env.get_observation_shape()[0], 2)
+agent = DQNAgent(env.get_observation_shape(), 2)
 # agent.load(CHECKPOINT_PATH)
 agent.eval_net.eval()
 agent.target_net.eval()
