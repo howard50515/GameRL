@@ -148,12 +148,26 @@ class FlappyBirdEnv(gym.Env):
                           action: Literal[0, 1]) -> float:
         if self.game_over:
             if self.pipe_collide:
-                return -5.0
+                return -1.0
+                #return -5.0
             else:
-                return -10.0
+                return -2.0
+                #return -10.0
         
         if self.over_pipe:
-            return 5.0
+            #return 5.0
+            return 10.0
+        
+        # Survival reward
+        survival_reward = 0.1
+
+        # Proximity to the pipe opening (encourage alignment with pipe center)
+        pipe_proximity_bonus = 1.0 if abs(self.next_pipe.spacing_y - self.player.rect.center[1]) < (PIPE_VERTICAL_SPACING // 3) else 0.0
+
+        # Jump penalty: Discourage unnecessary jumps far above the pipe
+        jump_penalty = -0.5 if action == 1 and self.player.rect.center[1] < self.next_pipe.spacing_y else 0.0
+
+        #return survival_reward + pipe_proximity_bonus + jump_penalty
         
         # note: pygame 遊戲中，離螢幕頂部越近，y 值越小
         # 高於管道洞口下緣，卻仍跳躍，給予懲罰
@@ -182,6 +196,7 @@ class FlappyBirdEnv(gym.Env):
         # 如果角色位於管道洞口高度，給予獎勵
         return 0.01 if abs(self.next_pipe.spacing_y - self.player.rect.center[1]) < (PIPE_VERTICAL_SPACING // 2) else 0.0
         # return 0.0
+        
     
     def _get_info(self) -> dict[str, Any]:
         return {
