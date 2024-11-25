@@ -60,9 +60,11 @@ class DQNAgent:
         states, actions, rewards, next_states = zip(*batch)
         
         # 將 numpy 轉換為 torch 張量
+        states = np.array(states, dtype=np.float32)  # 統一為一個 numpy.ndarray
         states = torch.tensor(states, dtype=torch.float32)
         actions = torch.tensor(actions, dtype=torch.int64)
         rewards = torch.tensor(rewards, dtype=torch.float32)
+        next_states = np.array(next_states, dtype=np.float32) 
         next_states = torch.tensor(next_states, dtype=torch.float32)
 
         # 計算目標 Q 值
