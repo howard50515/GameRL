@@ -44,10 +44,14 @@ for i_epoch in range(NUM_EPISODES):
     if i_epoch < decrease_batch:
         epsilon -= decrease_epsilon
 
+# 儲存模型
 output_dir = './dqn_model'
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
 seed_code = random.randint(100, 999)
 file_name = f'q_learning_{NUM_EPISODES}_{seed_code}.ckpt'
+save_path = os.path.join(output_dir, file_name)
 agent.save(save_path)
+
+print(f"Model saved to: {save_path}")
