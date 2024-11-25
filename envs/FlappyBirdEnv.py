@@ -84,6 +84,8 @@ class FlappyBirdEnv(gym.Env):
         self.game_over = False
         self.over_pipe = False
         self.score = 0
+        self.pipes_cleared = 0  # 每輪成功跳過的管道數
+
 
     def reset(self) -> tuple[np.ndarray, dict[str, Any]]:
         self._init_sprites()
@@ -95,7 +97,8 @@ class FlappyBirdEnv(gym.Env):
         self.over_pipe = False
         self.pipe_collide = False
         self.score = 0
-        
+        self.pipes_cleared = 0  # 重置成功跳過管道的次數
+
         observation = self._get_observation()
         info = self._get_info()
 
@@ -187,8 +190,10 @@ class FlappyBirdEnv(gym.Env):
         return {
             'score': self.score,
             'total_reward': self.total_reward,
-            'total_distance': self.total_distance
+            'total_distance': self.total_distance,
+            'pipes_cleared': self.pipes_cleared  # 新增管道成功次數
         }
+
     
     def _game_step(self, 
                    action: Literal[0, 1]) -> None:
@@ -207,6 +212,7 @@ class FlappyBirdEnv(gym.Env):
             self._new_pipes(self.pipes.sprites()[-1].rect.x + PIPE_HORIZONTAL_SPACING)
             self.over_pipe = True
             self.score += 1
+            self.pipes_cleared += 1  # 記錄成功跳過的管道數
 
         if self.mode == 1 or self.screen_debug:
             # 繪製畫面
