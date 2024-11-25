@@ -146,42 +146,42 @@ class FlappyBirdEnv(gym.Env):
     
     def _calculate_reward(self, 
                           action: Literal[0, 1]) -> float:
+        # 如果遊戲結束，根據碰撞情況給予懲罰
         if self.game_over:
-            if self.pipe_collide:
-                return -5.0
-            else:
-                return -10.0
-        
+            return -5.0 if self.pipe_collide else -10.0
+
+        # 通過管道，給予較大的正向獎勵
         if self.over_pipe:
             return 5.0
-        
-        # note: pygame 遊戲中，離螢幕頂部越近，y 值越小
-        # 高於管道洞口下緣，卻仍跳躍，給予懲罰
-        if action == 1:
-            if self.next_pipe.spacing_y + (PIPE_VERTICAL_SPACING // 2) > self.player.rect.center[1]:
-                return -1.0
-            else:
-                return 1.0
 
-        # 低於管道洞口下緣，且正在上升，給予獎勵
-        if self.player.y_velocity > 0 and self.next_pipe.spacing_y + (PIPE_VERTICAL_SPACING // 2) < self.player.rect.center[1]:
-            return 0.1
-        
-        # 高於管道洞口上緣，且正在上升，給予懲罰
-        if self.player.y_velocity > 0 and self.next_pipe.spacing_y - (PIPE_VERTICAL_SPACING // 2) > self.player.rect.center[1]:
-            return -0.1
-        
-        # 高於管道洞口上緣，且正在下墜，給予獎勵
-        if self.player.y_velocity < 0 and self.next_pipe.spacing_y - (PIPE_VERTICAL_SPACING // 2) > self.player.rect.center[1]:
-            return 0.1
-  
-        # 低於管道洞口下緣，且正在下墜，給予懲罰
-        if self.player.y_velocity < 0 and self.next_pipe.spacing_y + (PIPE_VERTICAL_SPACING // 2) < self.player.rect.center[1]:
-            return -0.1
-        
-        # 如果角色位於管道洞口高度，給予獎勵
-        return 0.01 if abs(self.next_pipe.spacing_y - self.player.rect.center[1]) < (PIPE_VERTICAL_SPACING // 2) else 0.0
-        # return 0.0
+        # 獲取角色與洞口中心的垂直距離
+        pipe_center = self.next_pipe.spacing_y
+        bird_center = self.player.rect.center[1]
+        distance_to_center = abs(pipe_center - bird_center)
+
+        # 根據距離給予獎勵或懲罰
+        if distance_to_center < (PIPE_VERTICAL_SPACING // 4):
+            reward = 0.5  # 靠近中心，獎勵
+        else:
+            reward = -0.1  # 偏離中心，懲罰
+
+        # 根據動作與垂直位置判斷
+        if action == 1:  # 跳躍
+            if bird_center < pipe_center + (PIPE_VERTICAL_SPACING // 2):  # 高於洞口下緣
+                reward -= 0.5  # 懲罰無效跳躍
+            else:
+                reward += 0.1  # 合理跳躍，微小獎勵
+        else:  # 不跳躍
+            if bird_center > pipe_center - (PIPE_VERTICAL_SPACING // 2):  # 低於洞口上緣
+                reward += 0.1  # 合理下降，獎勵
+            else:
+                reward -= 0.1  # 不合理不跳，懲罰
+
+        # 每個時間步生存，增加固定獎勵
+        reward += 0.1
+
+        return reward
+
     
     def _get_info(self) -> dict[str, Any]:
         return {

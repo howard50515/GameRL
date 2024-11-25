@@ -7,7 +7,7 @@ import torch
 from envs import FlappyBirdEnv
 from agents import DQNAgent
 
-NUM_EPISODES = 200
+NUM_EPISODES = 100
 STEP_PER_EPISODE = 1000
 
 # initialize Environment and Agent
@@ -75,7 +75,7 @@ plt.legend()
 plt.tight_layout()
 plt.show()
 
-'''# 儲存模型
+# 儲存模型
 output_dir = './dqn_model'
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
@@ -85,4 +85,4 @@ file_name = f'q_learning_{NUM_EPISODES}_{seed_code}.ckpt'
 save_path = os.path.join(output_dir, file_name)
 agent.save(save_path)
 
-print(f"Model saved to: {save_path}")'''
+print(f"Model saved to: {save_path}")
