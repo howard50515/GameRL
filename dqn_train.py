@@ -3,12 +3,12 @@ import pygame
 from envs import FlappyBirdEnv
 from agents import DQNAgent
 
-NUM_EPISODES = 500
+NUM_EPISODES = 5000
 STEP_PER_EPISODE = 200
 
 # initialize Environment and Agent
 #env = FlappyBirdEnv(1, True)
-env = FlappyBirdEnv(0, False)
+env = FlappyBirdEnv('numeric', False)
 
 agent = DQNAgent(env.get_observation_shape(), 2, lr=0.001)
 print(env.get_observation_shape())

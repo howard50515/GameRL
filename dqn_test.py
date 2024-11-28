@@ -8,7 +8,7 @@ STEP_PER_EPOCH = 1000
 CHECKPOINT_PATH = './q learning.cpkt'
 
 # initialize Environment and Agent
-env = FlappyBirdEnv(0, True)
+env = FlappyBirdEnv('numeric', True)
 '''The FlappyBird Environment.
 
         mode         : observation 模式，0 回傳純數字表示角色和管道位置、速度， 1 回傳畫面截圖
@@ -34,4 +34,3 @@ while True:
 
     # 使迴圈以 60FPS 運行，以便於觀看遊戲過程
     clock.tick(60)
-

@@ -63,9 +63,11 @@ class DQNAgent:
             return int(np.random.choice(range(self.n_actions)))
         else:  # Exploit
             state_tensor = torch.tensor(state, dtype=torch.float32).unsqueeze(0)
-            q_values = self.eval_net(state_tensor)
-            #print(np.random.choice(range(self.n_actions)))
-            return int(np.random.choice(range(self.n_actions)))
+            with torch.no_grad():
+                q_values = self.eval_net(state_tensor)
+            action = torch.argmax(q_values).item()
+            #print(f"Exploiting: Q-Values {q_values.numpy()}, Action {action}")
+            return action
 
 
     def store_transition(self, state, action, reward, next_state):
