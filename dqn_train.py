@@ -1,4 +1,6 @@
 import pygame
+import os
+import random
 
 from envs import FlappyBirdEnv
 from agents import DQNAgent
@@ -52,4 +54,14 @@ for i_epoch in range(NUM_EPISODES):
         epsilon = max(min_epsilon, epsilon - decrease_epsilon)
         #epsilon -= decrease_epsilon
 
-agent.save('./q learning.cpkt')
+# 儲存模型
+output_dir = './dqn_model'
+if not os.path.exists(output_dir):
+    os.makedirs(output_dir)
+
+seed_code = random.randint(100, 999)
+file_name = f'q_learning_{NUM_EPISODES}_{seed_code}.ckpt'
+save_path = os.path.join(output_dir, file_name)
+agent.save(save_path)
+
+print(f"Model saved to: {save_path}")
