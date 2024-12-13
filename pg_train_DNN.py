@@ -5,16 +5,20 @@ from typing import Literal
 from envs import FlappyBirdEnv
 from agents import PolicyGradientAgent
 
-NUM_BATCHES = 1000
+NUM_BATCHES = 5000
 EPISODE_PER_BATCH = 2
+def my_calculate_rewards(self: FlappyBirdEnv, action: Literal[0, 1]) -> float:
+    return 0.1
 
+class MyFlappyBirdEnv(FlappyBirdEnv):
+    _calculate_reward = my_calculate_rewards
 # initialize Environment and Agent
-env = FlappyBirdEnv(0, True)
+env = FlappyBirdEnv('numeric', True)
 
-agent = PolicyGradientAgent(env.get_observation_shape(), 2)
+agent = PolicyGradientAgent(env.get_observation_shape(), 2, lr=0.001)
 agent.network.train()
 
-temperature = 2
+temperature = 1
 decrease_batch = NUM_BATCHES * 0.6
 decrease_temperature = (temperature - 1.0) / decrease_batch
 
@@ -38,13 +42,11 @@ for i_bacth in range(NUM_BATCHES):
                 episode_total_reward += info['total_reward']
                 episode_total_score += info['score']
                 break
-            
-            clock.tick(60)
         
         agent.store_episode()
     agent.learn()
 
-    if (i_bacth + 1) % 10 == 0:
+    if (i_bacth + 1) % 50 == 0:
         agent.scheduler.step()
         print(f"{i_bacth + 1}/{NUM_BATCHES}, Lr: {agent.optimizer.param_groups[0]['lr']: .6f}, Temperature: {temperature: 4.2f}, Final Reward: {episode_total_reward: 4.2f}, Final Score: {episode_total_score}")
 
