@@ -38,6 +38,7 @@ for i_epoch in range(NUM_EPISODES):
         if truncated:
             state, _ = env.reset()
             epoch_total_reward += info['total_reward']
+            print("score: " + info['score'])
     
     #if (i_epoch + 1) % 5 == 0:
         #print(f"{i_epoch + 1}/{NUM_EPISODES}, Lr: {agent.optimizer.param_groups[0]['lr']: .6f}, Epsilon: {epsilon: 4.4f}, Final Reward: {epoch_total_reward: 4.2f}")
