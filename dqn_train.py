@@ -5,28 +5,28 @@ import random
 from envs import FlappyBirdEnv
 from agents import DQNAgent
 
-NUM_EPISODES = 5000
-STEP_PER_EPISODE = 200
+NUM_EPISODES = 600
+STEP_PER_EPISODE = 600
 
 # initialize Environment and Agent
 #env = FlappyBirdEnv(1, True)
-env = FlappyBirdEnv('numeric', False)
+env = FlappyBirdEnv('numeric', True)
 
 agent = DQNAgent(env.get_observation_shape(), 2, lr=0.001)
 print(env.get_observation_shape())
 agent.eval_net.train()
 agent.target_net.train()
 
-epsilon = 1.0
-min_epsilon = 0.1
-decrease_batch = NUM_EPISODES * 0.8  
+epsilon = 0.5
+min_epsilon = 0.0
+decrease_batch = NUM_EPISODES * 0.5 
 #decrease_epsilon = (epsilon - min_epsilon) / decrease_batch
-decrease_epsilon = 0.98 / decrease_batch
+decrease_epsilon = 0.5 / decrease_batch
 
 for i_epoch in range(NUM_EPISODES):
     state, _ = env.reset() # reset environment to initial state for each episode
     epoch_total_reward = 0
-
+    count = 0
     for i_step in range(STEP_PER_EPISODE):
         action = agent.sample(state, epsilon=epsilon)
 
@@ -35,7 +35,8 @@ for i_epoch in range(NUM_EPISODES):
         agent.store_transition(state, action, reward, next_state)
 
         agent.learn()
-        
+        for event in pygame.event.get():
+            pass
         state = next_state
         if truncated:
             state, _ = env.reset()

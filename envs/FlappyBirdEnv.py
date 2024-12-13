@@ -265,7 +265,7 @@ class FlappyBirdEnv(gym.Env):
 
     def _pipe_in_front(self, 
                        pipe: Pipe) -> bool:
-        return pipe.rect.x >= self.player.rect.center[0]
+        return (pipe.rect.x + PIPE_WIDTH) >= self.player.rect.x
 
     def _next_pipe(self) -> Pipe:
         """

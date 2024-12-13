@@ -5,7 +5,7 @@ from agents import DQNAgent
 
 EPOCHS = 1000
 STEP_PER_EPOCH = 1000
-CHECKPOINT_PATH = './q learning.cpkt'
+CHECKPOINT_PATH = './dqn_model\q_learning_600_225.ckpt'
 
 # initialize Environment and Agent
 env = FlappyBirdEnv('numeric', True)
@@ -27,10 +27,11 @@ clock = pygame.time.Clock()
 while True:
     action = agent.sample(state, 0)
     state, reward, truncated, info = env.step(action)
-
+    for event in pygame.event.get():
+            pass
     if truncated:
         print(f"Game Over. Score: {info['score']}")
         break
 
     # 使迴圈以 60FPS 運行，以便於觀看遊戲過程
-    clock.tick(60)
+    # clock.tick(60)
