@@ -53,6 +53,13 @@ class DQNAgent:
         loss.backward()
         self.optimizer.step()
 
+        # 每隔一定步驟更新 target 網路
+        if not hasattr(self, "update_step"):
+            self.update_step = 0
+        self.update_step += 1
+        if self.update_step % 100 == 0:
+            self.target_net.load_state_dict(self.eval_net.state_dict())
+
 
     def load(self, ckpt_path):
         if not os.path.exists(ckpt_path):
