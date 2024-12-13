@@ -41,10 +41,10 @@ class PolicyGradientAgent():
         log_prob = action_dist.log_prob(action)
         return action.item(), log_prob
 
-    def discounted_cumulative_rewards(self):
+    def discounted_cumulative_rewards(self, rewards):
         discounted_rewards = []
         cumulative_reward = 0
-        for reward in reversed(self.rewards):
+        for reward in reversed(rewards):
             cumulative_reward = reward + self.gamma * cumulative_reward
             discounted_rewards.insert(0, cumulative_reward)
         return discounted_rewards
@@ -59,7 +59,14 @@ class PolicyGradientAgent():
         """
         儲存一個 episode 所累積的 reward 及 log_prob
         """
-        rewards = self.discounted_cumulative_rewards()
+        if len(self.rewards) != len(self.log_probs):
+            print(f'Warning: Mismatch size with rewards ({len(self.rewards)}) and log_probs ({len(self.log_probs)})')
+
+        if len(self.rewards) >= 300:
+            self.rewards = self.rewards[-300:]
+            self.log_probs = self.log_probs[-300:]
+
+        rewards = self.discounted_cumulative_rewards(self.rewards)
         rewards = (rewards - np.mean(rewards)) / (np.std(rewards) + 1e-9)  # 將 reward 正規標準化
         self.episode_rewards.append(rewards)
         self.episode_log_probs.append(self.log_probs)
