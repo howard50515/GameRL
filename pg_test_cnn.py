@@ -1,3 +1,4 @@
+import numpy as np
 import pygame
 
 from typing import Literal
@@ -5,7 +6,7 @@ from typing import Literal
 from envs import FlappyBirdEnv
 from agents import PolicyGradientAgent
 
-CHECKPOINT_PATH = './p5000.cpkt'
+CHECKPOINT_PATH = './new_pg_3762.ckpt'
 
 # initialize Environment and Agent
 env = FlappyBirdEnv('rgb', True)
@@ -14,7 +15,10 @@ agent = PolicyGradientAgent(env.get_observation_shape(), 2)
 agent.load(CHECKPOINT_PATH)
 agent.network.eval()
 
-for i in range(10):
+total_score = 0
+num_test = 20
+scores = []
+for i in range(num_test):
     state, _ = env.reset()
     clock = pygame.time.Clock()
     while True:
@@ -27,19 +31,19 @@ for i in range(10):
 
         if truncated:
             print(f"Game Over. Score: {info['score']}")
+            scores.append(info['score'])
             break
 
-        # event = pygame.event.wait()
-        # if event.type == pygame.QUIT:
-        #     running = False
-        # elif event.type == pygame.KEYDOWN:
-        #     if event.key == pygame.K_SPACE:
-        #         pass
+        # 使主迴圈以 120FPS 運行，以便於觀看遊戲過程
+        # clock.tick(120)
+    
+    if (i + 1) % 10 == 0:
+        print('mean', np.mean(scores))
+        print('median', np.median(scores))
+        print('std', np.std(scores))
+        print('max', np.max(scores))
+        print('min', np.min(scores))
 
-        # 使主迴圈以 60FPS 運行，以便於觀看遊戲過程
-        clock.tick(60)
-
-    env.save_game_video(f'./video{i+1}.mp4', 60)
-
+    # env.save_game_video(f'./video{i+1}.mp4', 60)
 env.close()
 

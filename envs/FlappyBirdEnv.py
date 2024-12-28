@@ -132,10 +132,10 @@ class FlappyBirdEnv(gym.Env):
         self.total_reward += reward
         info = self._get_info()
 
-        if self.mode == 'rgb':
-            self.img_list.append(self._get_rgb_screen_image().transpose([1, 0, 2]))
-        elif self.mode == 'gray':
-            self.img_list.append(self._get_gray_scale_screen_image().transpose([1, 0]))
+        # if self.mode == 'rgb':
+        #     self.img_list.append(self._get_rgb_screen_image().transpose([1, 0, 2]))
+        # elif self.mode == 'gray':
+        #     self.img_list.append(self._get_gray_scale_screen_image().transpose([1, 0]))
             
         self.survived_tick += 1
 
@@ -198,12 +198,15 @@ class FlappyBirdEnv(gym.Env):
 
         hole_distance_ratio = (abs(pipe_hole_y - player_y) / half_extents) - 1
         
-        if hole_distance_ratio <= -0.5:
-            return 0.1
+        base_reward = 0.1
+        if hole_distance_ratio <= -0.75:
+            return base_reward
+        elif hole_distance_ratio <= 0.25:
+            return -hole_distance_ratio * base_reward
         elif hole_distance_ratio <= 0.0:
-            return -hole_distance_ratio * 0.1
+            return 0
         else:
-            return -min(hole_distance_ratio, 1) * 0.1
+            return -min(hole_distance_ratio, 1) * base_reward
 
         # return -min(1, (abs(pipe_hole_y - player_y) / half_extents) - 1) * 0.1
     
@@ -237,9 +240,6 @@ class FlappyBirdEnv(gym.Env):
             # 繪製畫面
             self.screen.fill(BLACK)
 
-            # for pipe in self.pipes:
-            #     pipe.blit_spacing(self.screen)
-
             self.player.draw(self.screen)
             self.pipes.draw(self.screen)
             score_text = self.scoreFont.render("Score: " + str(self.score), True, WHITE)
@@ -265,7 +265,7 @@ class FlappyBirdEnv(gym.Env):
 
     def _pipe_in_front(self, 
                        pipe: Pipe) -> bool:
-        return pipe.rect.x >= self.player.rect.center[0]
+        return (pipe.rect.x + PIPE_WIDTH) >= self.player.rect.x
 
     def _next_pipe(self) -> Pipe:
         """

@@ -7,6 +7,8 @@ from torch.distributions import Categorical
 
 from .networks import PolicyGradientDNN, PolicyGradientCNN
 
+BUFFER_SIZE = 300
+
 class PolicyGradientAgent():
     def __init__(self, 
                  input_dim: tuple[int, ...],
@@ -24,8 +26,10 @@ class PolicyGradientAgent():
 
         self.optimizer = optim.Adam(self.network.parameters(), lr=lr)
         self.scheduler = optim.lr_scheduler.ExponentialLR(self.optimizer, 0.995)
-        self.rewards = []
-        self.log_probs = []
+        self.rewards = [0] * BUFFER_SIZE
+        self.log_probs = [0] * BUFFER_SIZE
+        self.index = 0
+        self.count = 0
         self.episode_rewards = []
         self.episode_log_probs = []
         self.gamma = gamma
@@ -52,30 +56,35 @@ class PolicyGradientAgent():
     def store_transition(self,
                          reward: float,
                          log_prob: torch.Tensor) -> None:
-        self.rewards.append(reward)
-        self.log_probs.append(log_prob)
+        self.rewards[self.index] = reward
+        self.log_probs[self.index] = log_prob
+        
+        self.index = (self.index + 1) % BUFFER_SIZE
+        self.count = min(self.count + 1, BUFFER_SIZE)
 
     def store_episode(self) -> None:
         """
         儲存一個 episode 所累積的 reward 及 log_prob
         """
-        if len(self.rewards) != len(self.log_probs):
-            print(f'Warning: Mismatch size with rewards ({len(self.rewards)}) and log_probs ({len(self.log_probs)})')
+        if self.count < 300:
+            rewards = self.rewards[:self.count]
+            log_probs = self.log_probs[:self.count]
+        elif self.count == 300:
+            rewards = [self.rewards[(self.index + i) % BUFFER_SIZE] for i in range(BUFFER_SIZE)]
+            log_probs = [self.log_probs[(self.index + i) % BUFFER_SIZE] for i in range(BUFFER_SIZE)]
+        else:
+            print("something wrong in rewards and log_probs")
 
-        if len(self.rewards) >= 300:
-            self.rewards = self.rewards[-300:]
-            self.log_probs = self.log_probs[-300:]
-
-        rewards = self.discounted_cumulative_rewards(self.rewards)
+        rewards = self.discounted_cumulative_rewards(rewards)
         rewards = (rewards - np.mean(rewards)) / (np.std(rewards) + 1e-9)  # 將 reward 正規標準化
         self.episode_rewards.append(rewards)
-        self.episode_log_probs.append(self.log_probs)
+        self.episode_log_probs.append(log_probs)
 
-        self.rewards = []
-        self.log_probs = []
+        self.index = 0
+        self.count = 0
 
     def learn(self) -> None:
-        if len(self.rewards) > 0 and len(self.log_probs) > 0:
+        if self.count > 0:
             self.store_episode()
 
         self.optimizer.zero_grad()

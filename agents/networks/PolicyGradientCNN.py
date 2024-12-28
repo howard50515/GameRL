@@ -14,8 +14,7 @@ class PolicyGradientCNN(nn.Module):
         width, height = (width - 1) // 2 + 1, (height - 1) // 2 + 1
         self.pool1 = nn.MaxPool2d(2)
         width, height = width // 2, height // 2
-        self.conv2 = nn.Conv2d(16, 32, kernel_size=3, stride=2, padding=1)
-        width, height = (width - 1) // 2 + 1, (height - 1) // 2 + 1
+        self.conv2 = nn.Conv2d(16, 32, kernel_size=5, stride=1, padding=2)
         self.pool2 = nn.MaxPool2d(2)
         width, height = width // 2, height // 2
         # self.conv3 = nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1)
@@ -35,6 +34,6 @@ class PolicyGradientCNN(nn.Module):
         # x = F.relu(self.conv3(x))
         # x = self.pool3(x)
         x = torch.flatten(x, start_dim=0)
-        x = self.fc1(x)
-        x = self.fc2(x)
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
         return self.fc3(x)
