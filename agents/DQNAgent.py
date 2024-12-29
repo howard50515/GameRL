@@ -83,10 +83,15 @@ class DQNAgent:
         batch = random.sample(self.memory, batch_size)
         states, actions, rewards, next_states = zip(*batch)
 
-        states = torch.tensor(states, dtype=torch.float32)
-        actions = torch.tensor(actions, dtype=torch.long).unsqueeze(1)
-        rewards = torch.tensor(rewards, dtype=torch.float32).unsqueeze(1)
-        next_states = torch.tensor(next_states, dtype=torch.float32)
+        # 從記憶中隨機取樣
+        batch = random.sample(self.memory, batch_size)
+        states, actions, rewards, next_states = zip(*batch)
+
+        # 將 list 轉換為單一 numpy.ndarray，再轉換為 tensor
+        states = torch.tensor(np.array(states), dtype=torch.float32)
+        actions = torch.tensor(np.array(actions), dtype=torch.long).unsqueeze(1)
+        rewards = torch.tensor(np.array(rewards), dtype=torch.float32).unsqueeze(1)
+        next_states = torch.tensor(np.array(next_states), dtype=torch.float32)
 
         # Compute Q-values
         q_eval = self.eval_net(states).gather(1, actions)
@@ -101,6 +106,13 @@ class DQNAgent:
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
+
+        # 每隔一定步驟更新 target 網路
+        if not hasattr(self, "update_step"):
+            self.update_step = 0
+        self.update_step += 1
+        if self.update_step % 100 == 0:
+            self.target_net.load_state_dict(self.eval_net.state_dict())
 
     def load(self, ckpt_path):
         if not os.path.exists(ckpt_path):
